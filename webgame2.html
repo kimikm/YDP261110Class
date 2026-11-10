@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>웹게임 라운지 · WebPlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f141b; --bg2:#171d25; --panel:#1b2838; --panel2:#213246;
+  --line:#2a3f5a; --text:#c7d5e0; --muted:#8193a5; --white:#ffffff;
+  --accent:#66c0f4; --pos:#66c0f4; --mix:#b9a074; --neg:#c35c2c; --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.55;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none}
+
+/* 헤더 */
+header{position:sticky;top:0;z-index:50;background:rgba(23,29,37,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.nav{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:20px;padding:12px 16px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:20px;color:var(--white);letter-spacing:-.5px}
+.logo-mark{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--accent),#1b4f7a);display:grid;place-items:center;font-size:16px}
+.nav-links{display:flex;gap:18px;font-size:14px;font-weight:500}
+.nav-links a{color:var(--muted);transition:.2s}
+.nav-links a:hover,.nav-links a.on{color:var(--white)}
+.search{margin-left:auto;position:relative;flex:0 1 300px}
+.search input{width:100%;padding:9px 14px 9px 36px;border-radius:6px;border:1px solid var(--line);background:#0e1620;color:var(--white);font-size:14px;outline:none}
+.search input:focus{border-color:var(--accent)}
+.search::before{content:"🔍";position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.7}
+.wish-btn{background:var(--panel2);color:var(--text);padding:8px 12px;border-radius:6px;font-size:13px;white-space:nowrap}
+.wish-btn b{color:var(--accent)}
+
+main{max-width:1240px;margin:0 auto;padding:24px 16px 60px}
+
+/* ===== 썸네일 미디어 레이어 =====
+   z-index: 0 이모지(대체) → 1 실제 이미지 → 2 그라데이션 오버레이 → 3 배지/버튼 */
+.media{position:absolute;inset:0;display:grid;place-items:center;overflow:hidden}
+.media .fallback{position:relative;z-index:0;transition:opacity .3s}
+.media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .45s,transform .4s;z-index:1}
+.media img.loaded{opacity:1}
+.media img.contain{object-fit:contain;padding:18%;filter:drop-shadow(0 6px 18px rgba(0,0,0,.45))}
+.media.has-img .fallback{opacity:0}
+.media.loading::before{content:"";position:absolute;inset:0;z-index:1;
+  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%);
+  background-size:200% 100%;animation:shimmer 1.2s infinite}
+@keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+.card:hover .media img.loaded:not(.contain){transform:scale(1.05)}
+
+/* 히어로 */
+.hero{display:grid;grid-template-columns:1.6fr 1fr;border-radius:var(--radius);overflow:hidden;background:var(--panel);box-shadow:0 10px 40px rgba(0,0,0,.4);margin-bottom:12px;min-height:360px}
+.hero-art{position:relative;overflow:hidden;font-size:120px}
+.hero-art::after{content:"";position:absolute;inset:0;z-index:2;background:linear-gradient(90deg,transparent 65%,var(--panel))}
+.hero-info{padding:28px;display:flex;flex-direction:column;gap:12px}
+.hero-info .label{font-size:12px;color:var(--accent);font-weight:700;letter-spacing:1px}
+.hero-info h2{font-size:28px;color:var(--white);line-height:1.2}
+.hero-info p{font-size:14px}
+.hero-dots{display:flex;justify-content:center;gap:8px;margin-bottom:36px}
+.hero-dots button{width:14px;height:8px;border-radius:4px;background:var(--panel2);transition:.3s}
+.hero-dots button.on{background:var(--accent);width:28px}
+
+/* 섹션/필터 */
+.section-title{display:flex;align-items:end;justify-content:space-between;margin:8px 0 14px;gap:12px;flex-wrap:wrap}
+.section-title h3{font-size:15px;font-weight:700;color:var(--white)}
+.section-title span{font-size:13px;color:var(--muted)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{padding:7px 14px;border-radius:20px;background:var(--panel);color:var(--text);font-size:13px;border:1px solid transparent;transition:.2s}
+.chip:hover{border-color:var(--line)}
+.chip.on{background:var(--accent);color:#0b1a28;font-weight:700}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.toolbar select{background:var(--panel);color:var(--text);border:1px solid var(--line);padding:7px 10px;border-radius:6px;font-family:inherit;font-size:13px}
+.toolbar label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer}
+
+/* 카드 */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+.card{background:var(--panel);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;transition:transform .2s,box-shadow .2s;cursor:pointer;border:1px solid transparent}
+.card:hover{transform:translateY(-4px);box-shadow:0 12px 30px rgba(0,0,0,.45);border-color:var(--line)}
+.thumb{position:relative;aspect-ratio:1.91/1;font-size:60px}
+.thumb::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,0,.35) 0%,transparent 35%,transparent 70%,rgba(27,40,56,.6) 100%)}
+.badges{position:absolute;top:10px;left:10px;display:flex;gap:6px;z-index:3}
+.badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff}
+.badge.vibe{background:linear-gradient(90deg,#ff5f9e,#a259ff)}
+.badge.kr{background:#c4302b}
+.heart{position:absolute;top:8px;right:10px;z-index:3;background:rgba(0,0,0,.55);width:32px;height:32px;border-radius:50%;font-size:15px;display:grid;place-items:center}
+.card-body{padding:14px;display:flex;flex-direction:column;gap:8px;flex:1}
+.card-body h4{font-size:16px;color:var(--white)}
+.card-body .sub{font-size:12px;color:var(--muted);margin-top:-6px}
+.card-body .desc{font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tags{display:flex;gap:5px;flex-wrap:wrap}
+.tag{font-size:11px;background:rgba(103,193,245,.12);color:var(--accent);padding:2px 8px;border-radius:3px}
+.review{font-size:12px;display:flex;justify-content:space-between;gap:8px}
+.review .lbl{font-weight:700}
+.bar{height:5px;background:#0e1620;border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px}
+.scale{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:auto;padding-top:8px;border-top:1px solid var(--line)}
+.scale div{font-size:11px;color:var(--muted);text-align:center}
+.scale b{display:block;color:var(--white);font-size:12px;font-weight:500}
+.play{display:block;text-align:center;padding:10px;font-weight:700;font-size:14px;color:#d2efa9;background:linear-gradient(90deg,#75b022,#588a1b);border-radius:6px;transition:.2s}
+.play:hover{background:linear-gradient(90deg,#8ed629,#6aa621);color:#fff}
+.empty{grid-column:1/-1;text-align:center;padding:60px 0;color:var(--muted)}
+
+/* 모달 */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal.open{display:flex}
+.modal-box{background:var(--bg2);border-radius:12px;max-width:760px;width:100%;max-height:90vh;overflow:auto;border:1px solid var(--line);animation:pop .25s ease}
+@keyframes pop{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-art{position:relative;aspect-ratio:1.91/1;max-height:340px;width:100%;font-size:96px}
+.modal-art::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(180deg,transparent 60%,var(--bg2))}
+.close{position:absolute;top:12px;right:12px;z-index:3;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:18px}
+.modal-content{padding:24px;display:grid;grid-template-columns:1.5fr 1fr;gap:24px}
+.modal-content h2{color:var(--white);font-size:24px}
+.modal-content .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+.modal-content p{font-size:14px;margin-bottom:14px}
+.side{background:var(--panel);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:10px;font-size:13px;height:fit-content}
+.side .row{display:flex;justify-content:space-between;gap:10px}
+.side .row span:first-child{color:var(--muted)}
+.side .row span:last-child{color:var(--white);text-align:right}
+.react-box{background:var(--panel);border-radius:8px;padding:14px;margin-bottom:14px}
+.react-box h5{font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:500}
+.pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;font-size:12px}
+.pros-cons ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.pros li::before{content:"👍 "} .cons li::before{content:"👎 "}
+.note{font-size:11px;color:var(--muted);margin-top:8px}
+
+footer{border-top:1px solid var(--line);padding:24px 16px;text-align:center;font-size:12px;color:var(--muted)}
+
+@media (max-width:820px){
+  .hero{grid-template-columns:1fr}
+  .hero-art{aspect-ratio:1.91/1;font-size:90px}
+  .hero-art::after{background:linear-gradient(180deg,transparent 60%,var(--panel))}
+  .nav-links{display:none}
+  .modal-content{grid-template-columns:1fr}
+  .pros-cons{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <a class="logo" href="#"><div class="logo-mark">🎮</div>WebPlay</a>
+    <nav class="nav-links">
+      <a href="#" class="on">스토어</a>
+      <a href="#list">전체 게임</a>
+      <a href="#list" onclick="setGenre('바이브코딩')">바이브코딩</a>
+    </nav>
+    <div class="search"><input id="q" type="text" placeholder="게임 이름, 태그 검색"></div>
+    <button class="wish-btn" onclick="toggleWishOnly()">❤ 찜 <b id="wishCount">0</b></button>
+  </div>
+</header>
+
+<main>
+  <section class="hero" id="hero"></section>
+  <div class="hero-dots" id="dots"></div>
+
+  <div class="section-title" id="list">
+    <h3>전체 웹게임 둘러보기</h3>
+    <span id="countTxt"></span>
+  </div>
+  <div class="filters" id="genres"></div>
+  <div class="toolbar">
+    <select id="sort">
+      <option value="rating">평가 높은 순</option>
+      <option value="short">짧게 즐기기 좋은 순</option>
+      <option value="light">용량 가벼운 순</option>
+      <option value="new">최신 순</option>
+      <option value="name">이름 순</option>
+    </select>
+    <label><input type="checkbox" id="mobileOnly"> 모바일 지원만</label>
+    <label><input type="checkbox" id="multiOnly"> 멀티플레이만</label>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<footer>
+  WebPlay는 무료로 즐길 수 있는 웹게임을 모아 소개하는 큐레이션 페이지입니다. 썸네일은 각 게임 공식 페이지가 공유용으로 제공하는 대표 이미지이며, 모든 권리는 각 개발자에게 있습니다.<br>
+  용량·플레이 시간·유저 반응은 대략적인 참고용 수치입니다.
+</footer>
+
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" id="modalBox"></div>
+</div>
+
+<script>
+/* =========================================================
+   게임 데이터
+   size: 대략 용량(MB) · time: 1회 플레이(분) · rating: 긍정 비율 추정(%)
+   thumb: (선택) 대표 이미지 URL을 직접 지정하면 자동 수집보다 우선 사용
+   ========================================================= */
+const GAMES = [
+  {id:1,title:"2048",sub:"숫자 합치기 퍼즐",dev:"Gabriele Cirulli",year:2014,genre:["퍼즐","캐주얼"],tags:["숫자","1인","중독성"],
+   emoji:"🔢",c1:"#edc22e",c2:"#f59563",url:"https://play2048.co/",size:0.3,time:10,players:"1인",mobile:true,
+   desc:"방향키로 타일을 밀어 같은 숫자를 합쳐 2048 타일을 만드는 퍼즐 게임입니다. 규칙은 단순하지만 한 판만 더 하게 되는 대표적인 웹게임 고전입니다.",
+   rating:93,pros:["규칙이 쉬움","가볍고 빠름","출퇴근길에 딱"],cons:["후반 운 요소","반복적"]},
+  {id:2,title:"Slither.io",sub:"지렁이 서바이벌 io",dev:"Lowtech Studios",year:2016,genre:["액션","멀티플레이",".io"],tags:["실시간","경쟁","캐주얼"],
+   emoji:"🐍",c1:"#1f8a4c",c2:"#0d3b2a",url:"https://slither.io/",size:3,time:15,players:"대규모 멀티",mobile:true,
+   desc:"빛나는 먹이를 먹고 몸을 키우며, 다른 플레이어가 내 몸에 머리를 부딪히게 만들어 쓰러뜨리는 실시간 멀티 게임입니다.",
+   rating:84,pros:["직관적인 조작","역전의 짜릿함"],cons:["광고가 잦음","서버 지연"]},
+  {id:3,title:"Agar.io",sub:"세포 먹기 io의 원조",dev:"Miniclip",year:2015,genre:["액션","멀티플레이",".io"],tags:["실시간","경쟁"],
+   emoji:"🟢",c1:"#4ba3ff",c2:"#18324f",url:"https://agar.io/",size:4,time:15,players:"대규모 멀티",mobile:true,
+   desc:"작은 세포를 조종해 먹이와 더 작은 플레이어를 흡수하며 커지는 게임. 이후 수많은 '.io' 게임 장르를 탄생시킨 작품입니다.",
+   rating:78,pros:["장르의 원조","단순한 재미"],cons:["팀플 악용","광고"]},
+  {id:4,title:"Diep.io",sub:"탱크 성장 슈팅",dev:"Zeach",year:2016,genre:["슈팅","멀티플레이",".io"],tags:["업그레이드","전략"],
+   emoji:"🛡️",c1:"#00b2e1",c2:"#1b3a52",url:"https://diep.io/",size:3,time:20,players:"대규모 멀티",mobile:true,
+   desc:"도형을 부수며 경험치를 얻고, 탱크를 다양한 클래스로 진화시키며 싸우는 탑뷰 슈팅 게임입니다.",
+   rating:86,pros:["빌드 다양성","성장하는 손맛"],cons:["고인물이 많음"]},
+  {id:5,title:"Krunker.io",sub:"브라우저 FPS",dev:"Yendis Entertainment",year:2018,genre:["슈팅","멀티플레이",".io"],tags:["FPS","빠른템포","픽셀"],
+   emoji:"🎯",c1:"#e2453c",c2:"#3a1b1b",url:"https://krunker.io/",size:60,time:20,players:"멀티",mobile:false,
+   desc:"설치 없이 브라우저에서 바로 즐기는 빠른 템포의 1인칭 슈팅 게임. 픽셀 그래픽과 슬라이드·점프 이동이 특징입니다.",
+   rating:82,pros:["설치 없는 본격 FPS","부드러운 프레임"],cons:["핵 유저","PC 전용에 가까움"]},
+  {id:6,title:"Shell Shockers",sub:"계란 FPS",dev:"Blue Wizard Digital",year:2017,genre:["슈팅","멀티플레이"],tags:["FPS","유머"],
+   emoji:"🥚",c1:"#f6d36b",c2:"#6b4c1b",url:"https://shellshock.io/",size:40,time:15,players:"멀티",mobile:true,
+   desc:"무장한 계란이 되어 싸우는 유쾌한 온라인 FPS입니다. 가벼운 사양으로도 잘 돌아갑니다.",
+   rating:80,pros:["유머러스한 콘셉트","저사양 OK"],cons:["단조로운 맵"]},
+  {id:7,title:"Skribbl.io",sub:"그림 맞히기 파티",dev:"skribbl.io",year:2017,genre:["파티","멀티플레이",".io"],tags:["친구","그림","단어"],
+   emoji:"🖍️",c1:"#3d6bd9",c2:"#1a2a5a",url:"https://skribbl.io/",size:1,time:20,players:"2~12인",mobile:true,
+   desc:"한 명이 제시어를 그림으로 그리고 나머지가 채팅으로 정답을 맞히는 캐치마인드형 게임. 비공개 방에 한국어 단어를 직접 넣어 친구들과 즐길 수 있습니다.",
+   rating:92,pros:["친구랑 하면 최고","사용자 단어 지원"],cons:["공개방 매너 이슈"]},
+  {id:8,title:"Gartic Phone",sub:"그림 전화 게임",dev:"Onrizon",year:2020,genre:["파티","멀티플레이"],tags:["친구","그림","웃음"],
+   emoji:"☎️",c1:"#7a3cff",c2:"#2a1660",url:"https://garticphone.com/ko",size:2,time:25,players:"4~30인",mobile:true,
+   desc:"문장을 그림으로, 그림을 다시 문장으로 이어가며 내용이 점점 엉뚱하게 바뀌는 과정을 즐기는 파티 게임입니다. 한국어를 지원합니다.",
+   rating:95,pros:["폭소 보장","한국어 지원","인원 제한 넉넉"],cons:["혼자서는 불가"]},
+  {id:9,title:"GeoGuessr",sub:"위치 추리 여행",dev:"GeoGuessr AB",year:2013,genre:["퍼즐","교육"],tags:["지리","스트리트뷰"],
+   emoji:"🌍",c1:"#2aa876",c2:"#1b3b5a",url:"https://www.geoguessr.com/",size:20,time:15,players:"1인/대전",mobile:true,
+   desc:"스트리트뷰 화면만 보고 지구 어디인지 추리해 지도에 찍는 게임입니다. 표지판, 도로, 식생 같은 단서를 읽는 재미가 있습니다.",
+   rating:88,pros:["세계여행 기분","실력이 느는 재미"],cons:["무료 플레이 제한"]},
+  {id:10,title:"Wordle",sub:"하루 한 단어",dev:"The New York Times",year:2021,genre:["퍼즐","단어"],tags:["데일리","영어"],
+   emoji:"🟩",c1:"#6aaa64",c2:"#3a3a3c",url:"https://www.nytimes.com/games/wordle/index.html",size:1,time:5,players:"1인",mobile:true,
+   desc:"6번 안에 다섯 글자 영어 단어를 맞히는 하루 한 판 퍼즐. 색깔 힌트로 정답을 좁혀 나가며 결과를 공유하는 문화가 유행했습니다.",
+   rating:91,pros:["하루 5분","공유하는 재미"],cons:["영어 단어 지식 필요"]},
+  {id:11,title:"꼬맨틀",sub:"단어 유사도 추리",dev:"newsjel.ly",year:2022,genre:["퍼즐","단어"],tags:["데일리","한국어"],
+   emoji:"🔤",c1:"#5b6cff",c2:"#232a6a",url:"https://semantle-ko.newsjel.ly/",size:1,time:15,players:"1인",mobile:true,kr:true,
+   desc:"해외 게임 Semantle의 한국어 버전. 단어를 입력하면 정답과 의미가 얼마나 가까운지 점수로 알려주며, 이를 단서로 오늘의 단어를 맞힙니다.",
+   rating:87,pros:["한국어 퍼즐","머리 쓰는 재미"],cons:["난이도 편차 큼"]},
+  {id:12,title:"Little Alchemy 2",sub:"원소 조합",dev:"Recloak",year:2017,genre:["퍼즐","캐주얼"],tags:["조합","발견"],
+   emoji:"⚗️",c1:"#ff8a5c",c2:"#4a2a5a",url:"https://littlealchemy2.com/",size:10,time:30,players:"1인",mobile:true,
+   desc:"물·불·흙·공기 네 원소를 조합해 수백 가지의 사물과 개념을 만들어내는 발견형 퍼즐 게임입니다.",
+   rating:90,pros:["발견의 기쁨","아이와 함께 OK"],cons:["후반 막힘"]},
+  {id:13,title:"A Dark Room",sub:"텍스트 어드벤처",dev:"Doublespeak Games",year:2013,genre:["방치형","RPG"],tags:["텍스트","스토리","미니멀"],
+   emoji:"🔥",c1:"#3a3a3a",c2:"#111111",url:"https://adarkroom.doublespeakgames.com/",size:1,time:180,players:"1인",mobile:true,
+   desc:"어두운 방에서 불을 피우는 것부터 시작해 마을을 키우고 미지의 세계를 탐험하는 미니멀 텍스트 게임. 점점 드러나는 이야기가 인상적입니다.",
+   rating:94,pros:["몰입감 있는 반전","글만으로 긴장감"],cons:["초반이 느림"]},
+  {id:14,title:"Universal Paperclips",sub:"클립 생산 방치형",dev:"Frank Lantz",year:2017,genre:["방치형","시뮬레이션"],tags:["AI","전략","클리커"],
+   emoji:"📎",c1:"#d9d9d9",c2:"#4d4d4d",url:"https://www.decisionproblem.com/paperclips/",size:0.5,time:300,players:"1인",mobile:true,
+   desc:"클립을 최대한 많이 만드는 것이 목표인 AI가 되어 사업을 확장해 나가는 클리커 게임. 단순한 숫자 놀이가 상상 못 한 규모로 커지는 전개가 화제였습니다.",
+   rating:95,pros:["철학적인 결말","중독성 최상"],cons:["시간 순삭 주의"]},
+  {id:15,title:"Cookie Clicker",sub:"쿠키 굽기 클리커",dev:"Orteil",year:2013,genre:["방치형","캐주얼"],tags:["클리커","장기"],
+   emoji:"🍪",c1:"#c68642",c2:"#4a2c14",url:"https://orteil.dashnet.org/cookieclicker/",size:5,time:600,players:"1인",mobile:true,
+   desc:"쿠키를 클릭해 굽고, 할머니와 공장을 고용해 쿠키 제국을 키우는 방치형 게임의 대명사입니다.",
+   rating:92,pros:["방치형의 정석","꾸준한 업데이트"],cons:["끝이 없음"]},
+  {id:16,title:"The Password Game",sub:"비밀번호 만들기",dev:"Neal Agarwal",year:2023,genre:["퍼즐","유머"],tags:["규칙","황당"],
+   emoji:"🔐",c1:"#f2f2f2",c2:"#8c8c8c",url:"https://neal.fun/password-game/",size:2,time:30,players:"1인",mobile:true,
+   desc:"점점 황당해지는 비밀번호 규칙을 모두 만족하는 비밀번호를 만드는 퍼즐. 회원가입 화면을 패러디한 아이디어로 큰 화제가 되었습니다.",
+   rating:93,pros:["기발한 아이디어","웃음 포인트"],cons:["후반 규칙 난이도","영어 이해 필요"]},
+  {id:17,title:"Spend Bill Gates' Money",sub:"억만장자 돈 쓰기",dev:"Neal Agarwal",year:2019,genre:["시뮬레이션","유머"],tags:["경제","가벼움"],
+   emoji:"💸",c1:"#2fbf71",c2:"#14532d",url:"https://neal.fun/spend/",size:2,time:10,players:"1인",mobile:true,
+   desc:"빌 게이츠의 재산으로 햄버거부터 요트, 스포츠 구단까지 마음껏 사보는 체험형 게임. 막대한 부의 규모를 실감하게 해줍니다.",
+   rating:89,pros:["짧고 신선함","의외의 교육 효과"],cons:["금방 끝남"]},
+  {id:18,title:"Quick, Draw!",sub:"AI 그림 맞히기",dev:"Google Creative Lab",year:2016,genre:["캐주얼","교육"],tags:["AI","그림"],
+   emoji:"✏️",c1:"#fbbc05",c2:"#34495e",url:"https://quickdraw.withgoogle.com/",size:2,time:5,players:"1인",mobile:true,
+   desc:"20초 안에 제시어를 그리면 AI가 무엇인지 맞혀보는 게임. 머신러닝을 놀이처럼 체험할 수 있으며 한국어도 지원합니다.",
+   rating:88,pros:["AI 체험","한국어 지원"],cons:["짧은 콘텐츠"]},
+  {id:19,title:"QWOP",sub:"악명 높은 달리기",dev:"Bennett Foddy",year:2008,genre:["액션","유머"],tags:["고난도","물리"],
+   emoji:"🏃",c1:"#3b8ed6",c2:"#5a3b1b",url:"https://www.foddy.net/Athletics.html",size:1,time:10,players:"1인",mobile:false,
+   desc:"Q·W·O·P 네 키로 육상선수의 허벅지와 종아리를 각각 조종해 100m를 달려야 하는 게임. 넘어지는 모습 자체가 웃음 포인트입니다.",
+   rating:76,pros:["밈이 된 명작","방송용으로 최고"],cons:["극악의 난이도"]},
+  {id:20,title:"Line Rider",sub:"선 그리기 썰매",dev:"Line Rider",year:2006,genre:["창작","캐주얼"],tags:["물리","샌드박스"],
+   emoji:"🛷",c1:"#e8e8e8",c2:"#4a6a8a",url:"https://www.linerider.com/",size:5,time:30,players:"1인",mobile:false,
+   desc:"선을 그어 트랙을 만들면 썰매를 탄 캐릭터가 물리 법칙에 따라 달려 내려갑니다. 정해진 목표 없이 상상력을 펼치는 샌드박스 고전입니다.",
+   rating:89,pros:["무한한 창작","힐링"],cons:["목표가 없음"]},
+  {id:21,title:"Hextris",sub:"육각형 테트리스",dev:"Hextris Team",year:2014,genre:["퍼즐","아케이드"],tags:["오픈소스","반사신경"],
+   emoji:"⬢",c1:"#e74c3c",c2:"#2c3e50",url:"https://hextris.io/",size:1,time:10,players:"1인",mobile:true,
+   desc:"사방에서 떨어지는 블록을 육각형을 회전시켜 같은 색끼리 맞추는 테트리스 변형 게임입니다. 오픈소스로 공개되어 있습니다.",
+   rating:83,pros:["신선한 변형","광고 없음"],cons:["빨라지면 어지러움"]},
+  {id:22,title:"Tetris",sub:"공식 웹 테트리스",dev:"The Tetris Company",year:1984,genre:["퍼즐","아케이드"],tags:["고전","블록"],
+   emoji:"🧱",c1:"#00b4d8",c2:"#03045e",url:"https://tetris.com/play-tetris",size:5,time:10,players:"1인",mobile:true,
+   desc:"설명이 필요 없는 블록 쌓기 퍼즐의 공식 웹 버전. 가로줄을 채워 지우며 최대한 오래 버티세요.",
+   rating:85,pros:["영원한 고전","공식 버전"],cons:["광고"]},
+  {id:23,title:"Paper.io 2",sub:"영역 따먹기",dev:"Voodoo",year:2018,genre:["액션","멀티플레이",".io"],tags:["땅따먹기","캐주얼"],
+   emoji:"🟥",c1:"#ff6b6b",c2:"#3a1b3a",url:"https://paper-io.com/",size:10,time:10,players:"멀티",mobile:true,
+   desc:"선을 그으며 이동해 내 영역으로 감싸 땅을 넓히는 게임. 다른 플레이어의 꼬리를 끊으면 탈락시킬 수 있습니다.",
+   rating:77,pros:["짧은 판","쉬운 조작"],cons:["봇 위주 매치","광고"]},
+  {id:24,title:"Bloxd.io",sub:"블록 샌드박스",dev:"Bloxd",year:2021,genre:["샌드박스","멀티플레이",".io"],tags:["복셀","파쿠르","건축"],
+   emoji:"⛏️",c1:"#7cb342",c2:"#4e342e",url:"https://bloxd.io/",size:80,time:40,players:"멀티",mobile:true,
+   desc:"마인크래프트풍 복셀 세계에서 건축, 서바이벌, 파쿠르, 배틀 등 다양한 모드를 즐길 수 있는 브라우저 샌드박스 게임입니다.",
+   rating:81,pros:["모드가 다양","설치 불필요"],cons:["저사양 PC 버벅임"]},
+  {id:25,title:"1v1.LOL",sub:"건축 슈터",dev:"Lior Alterman",year:2019,genre:["슈팅","멀티플레이"],tags:["건축","배틀"],
+   emoji:"🏗️",c1:"#ff9f1c",c2:"#2b2d42",url:"https://1v1.lol/",size:100,time:15,players:"1:1 / 배틀로얄",mobile:true,
+   desc:"벽과 계단을 빠르게 지으며 싸우는 3인칭 건축 슈팅 게임. 포트나이트식 건축 연습용으로도 많이 쓰입니다.",
+   rating:79,pros:["건축 연습에 최적","빠른 매칭"],cons:["무거운 편","고수 비율 높음"]},
+  {id:26,title:"fly.pieter.com",sub:"AI로 만든 비행 MMO",dev:"Pieter Levels",year:2025,genre:["바이브코딩","시뮬레이션","멀티플레이"],tags:["AI제작","비행","실시간"],
+   emoji:"✈️",c1:"#5dade2",c2:"#1b4f72",url:"https://fly.pieter.com/",size:15,time:15,players:"대규모 멀티",mobile:true,vibe:true,
+   desc:"개발자 피터 레벨스가 AI 코딩 도구로 빠르게 만든 브라우저 비행 시뮬레이터. 다른 플레이어들과 하늘을 날며 공중전을 벌일 수 있으며, 바이브코딩 게임 열풍의 상징처럼 소개되었습니다.",
+   rating:72,pros:["바이브코딩의 상징","바로 접속"],cons:["콘텐츠가 단순","인게임 광고"]}
+];
+
+/* =========================================================
+   대표 썸네일 로더
+   1) g.thumb 직접 지정  2) 공식 페이지 og:image (메타데이터 API)
+   3) 사이트 로고/파비콘  4) 이모지 대체 썸네일
+   결과는 7일간 브라우저에 캐시
+   ========================================================= */
+const THUMB_KEY = "webplay_thumbs_v1", THUMB_TTL = 7*24*60*60*1000;
+let thumbStore = {};
+try{ thumbStore = JSON.parse(localStorage.getItem(THUMB_KEY)||"{}"); }catch(e){}
+const saveThumbs = ()=>{ try{ localStorage.setItem(THUMB_KEY, JSON.stringify(thumbStore)); }catch(e){} };
+const pending = {};
+const queue = []; let active = 0; const MAX_CONCURRENT = 3;
+
+function runQueue(){
+  while(active < MAX_CONCURRENT && queue.length){
+    const job = queue.shift(); active++;
+    job().finally(()=>{ active--; runQueue(); });
+  }
+}
+function fetchMeta(g){
+  return new Promise(resolve=>{
+    queue.push(async ()=>{
+      try{
+        const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(g.url)}`);
+        const json = await res.json();
+        const d = (json && json.data) || {};
+        if(d.image && d.image.url) resolve({src:d.image.url, fit:"cover"});
+        else if(d.logo && d.logo.url) resolve({src:d.logo.url, fit:"contain"});
+        else resolve(null);
+      }catch(e){ resolve(null); }
+    });
+    runQueue();
+  });
+}
+function getThumb(g){
+  if(g.thumb) return Promise.resolve({src:g.thumb, fit:"cover"});
+  const c = thumbStore[g.id];
+  if(c && c.url===g.url && Date.now()-c.ts < THUMB_TTL) return Promise.resolve(c.data);
+  if(!pending[g.id]){
+    pending[g.id] = fetchMeta(g).then(data=>{
+      if(data){ thumbStore[g.id] = {data, ts:Date.now(), url:g.url}; saveThumbs(); }
+      else delete pending[g.id];       // 실패 시 다음에 재시도
+      return data;
+    });
+  }
+  return pending[g.id];
+}
+const faviconOf = g => `https://www.google.com/s2/favicons?domain=${new URL(g.url).hostname}&sz=128`;
+
+function loadMedia(el){
+  if(!el || el.dataset.done) return;
+  el.dataset.done = "1";
+  const g = GAMES.find(x=>x.id==el.dataset.id);
+  const img = el.querySelector("img");
+  el.classList.add("loading");
+  const finish = ()=> el.classList.remove("loading");
+  const show = (src, fit, onFail)=>{
+    img.className = fit==="contain" ? "contain" : "";
+    img.onload = ()=>{ img.classList.add("loaded"); el.classList.add("has-img"); finish(); };
+    img.onerror = onFail;
+    img.src = src;
+  };
+  const tryFavicon = ()=> show(faviconOf(g), "contain", ()=>{ img.removeAttribute("src"); finish(); });
+  getThumb(g).then(t=>{
+    if(t) show(t.src, t.fit, ()=>{ delete thumbStore[g.id]; saveThumbs(); tryFavicon(); });
+    else tryFavicon();
+  });
+}
+const mediaHTML = g => `
+  <div class="media" data-id="${g.id}">
+    <span class="fallback">${g.emoji}</span>
+    <img alt="${g.title} 대표 이미지" referrerpolicy="no-referrer" decoding="async">
+  </div>`;
+
+// 화면에 보일 때만 불러오기 (요청 수 절약)
+const io = "IntersectionObserver" in window
+  ? new IntersectionObserver(entries=>entries.forEach(e=>{
+      if(e.isIntersecting){ io.unobserve(e.target); loadMedia(e.target); }
+    }), {rootMargin:"200px"})
+  : null;
+function observeMedia(root){
+  root.querySelectorAll(".media").forEach(m=> io ? io.observe(m) : loadMedia(m));
+}
+
+/* ========== 상태 ========== */
+const GENRES = ["전체","바이브코딩",".io","멀티플레이","퍼즐","파티","방치형","슈팅","액션","단어","시뮬레이션","캐주얼","샌드박스","창작","교육","유머"];
+let state = {genre:"전체", q:"", sort:"rating", mobile:false, multi:false, wishOnly:false};
+let wish = new Set();
+try{ wish = new Set(JSON.parse(localStorage.getItem("webplay_wish")||"[]")); }catch(e){}
+const saveWish = ()=>{ try{ localStorage.setItem("webplay_wish", JSON.stringify([...wish])); }catch(e){} };
+
+/* ========== 유틸 ========== */
+function reaction(r){
+  if(r>=95) return {t:"압도적으로 긍정적",c:"var(--pos)"};
+  if(r>=85) return {t:"매우 긍정적",c:"var(--pos)"};
+  if(r>=75) return {t:"대체로 긍정적",c:"var(--pos)"};
+  if(r>=40) return {t:"복합적",c:"var(--mix)"};
+  return {t:"부정적",c:"var(--neg)"};
+}
+const fmtSize = mb => mb<1 ? `약 ${Math.round(mb*1000)}KB` : `약 ${mb}MB`;
+function fmtTime(m){
+  if(m<60) return `${m}분`;
+  const h = m/60; return h>=10 ? "10시간+" : `${Math.round(h*10)/10}시간`;
+}
+function scaleLabel(g){
+  const s = g.size + g.time/10;
+  return s<5?"초경량":s<20?"가벼움":s<60?"보통":"큰 규모";
+}
+const isMulti = g => g.genre.includes("멀티플레이") || g.genre.includes("파티");
+const art = g => `background:linear-gradient(135deg,${g.c1},${g.c2})`;
+
+/* ========== 히어로 ========== */
+const FEATURED = [26,8,14,13,7].map(id=>GAMES.find(g=>g.id===id));
+let heroIdx = 0, heroTimer;
+function renderHero(){
+  const g = FEATURED[heroIdx], r = reaction(g.rating);
+  const hero = document.getElementById("hero");
+  hero.innerHTML = `
+    <div class="hero-art" style="${art(g)}">${mediaHTML(g)}</div>
+    <div class="hero-info">
+      <div class="label">${g.vibe?"🔥 바이브코딩 화제작":"⭐ 추천 및 인기 게임"}</div>
+      <h2>${g.title}</h2>
+      <p>${g.desc}</p>
+      <div class="tags">${g.tags.map(t=>`<span class="tag">${t}</span>`).join("")}</div>
+      <div class="review"><span>유저 반응</span><span class="lbl" style="color:${r.c}">${r.t} (${g.rating}%)</span></div>
+      <div class="scale" style="border:none;padding:0">
+        <div>용량<b>${fmtSize(g.size)}</b></div><div>1회 플레이<b>${fmtTime(g.time)}</b></div><div>인원<b>${g.players}</b></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:auto">
+        <a class="play" style="flex:1" href="${g.url}" target="_blank" rel="noopener">▶ 지금 플레이</a>
+        <button class="wish-btn" onclick="openModal(${g.id})">자세히</button>
+      </div>
+    </div>`;
+  loadMedia(hero.querySelector(".media"));
+  // 다음 추천작 이미지 미리 받아두기
+  getThumb(FEATURED[(heroIdx+1)%FEATURED.length]);
+  document.getElementById("dots").innerHTML = FEATURED.map((_,i)=>
+    `<button class="${i===heroIdx?"on":""}" onclick="goHero(${i})" aria-label="${i+1}번 추천"></button>`).join("");
+}
+function goHero(i){ heroIdx=i; renderHero(); clearInterval(heroTimer); heroTimer=setInterval(nextHero,6000); }
+function nextHero(){ heroIdx=(heroIdx+1)%FEATURED.length; renderHero(); }
+
+/* ========== 필터/목록 ========== */
+function renderGenres(){
+  document.getElementById("genres").innerHTML = GENRES.map(g=>
+    `<button class="chip ${state.genre===g?"on":""}" onclick="setGenre('${g}')">${g==="바이브코딩"?"✨ ":""}${g}</button>`).join("");
+}
+function setGenre(g){ state.genre=g; state.wishOnly=false; renderGenres(); renderGrid(); }
+function toggleWishOnly(){ state.wishOnly=!state.wishOnly; renderGrid(); document.getElementById("list").scrollIntoView({behavior:"smooth"}); }
+
+function filtered(){
+  const q = state.q.trim().toLowerCase();
+  const list = GAMES.filter(g=>{
+    if(state.wishOnly && !wish.has(g.id)) return false;
+    if(state.genre!=="전체" && !g.genre.includes(state.genre)) return false;
+    if(state.mobile && !g.mobile) return false;
+    if(state.multi && !isMulti(g)) return false;
+    if(q){
+      const hay = [g.title,g.sub,g.dev,g.desc,...g.genre,...g.tags].join(" ").toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const s = {
+    rating:(a,b)=>b.rating-a.rating, short:(a,b)=>a.time-b.time,
+    light:(a,b)=>a.size-b.size, new:(a,b)=>b.year-a.year, name:(a,b)=>a.title.localeCompare(b.title)
+  }[state.sort];
+  return list.sort(s);
+}
+
+function renderGrid(){
+  const list = filtered();
+  document.getElementById("countTxt").textContent = state.wishOnly ? `찜한 게임 ${list.length}개` : `${list.length}개의 게임`;
+  document.getElementById("wishCount").textContent = wish.size;
+  const grid = document.getElementById("grid");
+  if(!list.length){ grid.innerHTML = `<div class="empty">조건에 맞는 게임이 없어요 🕹️<br>다른 장르나 검색어를 시도해 보세요.</div>`; return; }
+  grid.innerHTML = list.map(g=>{
+    const r = reaction(g.rating);
+    return `
+    <article class="card" onclick="openModal(${g.id})">
+      <div class="thumb" style="${art(g)}">
+        ${mediaHTML(g)}
+        <div class="badges">
+          ${g.vibe?'<span class="badge vibe">바이브코딩</span>':""}
+          ${g.kr?'<span class="badge kr">한국어</span>':""}
+          <span class="badge">${scaleLabel(g)}</span>
+        </div>
+        <button class="heart" onclick="event.stopPropagation();toggleWish(${g.id})" aria-label="찜하기">${wish.has(g.id)?"❤️":"🤍"}</button>
+      </div>
+      <div class="card-body">
+        <h4>${g.title}</h4>
+        <div class="sub">${g.sub} · ${g.year}</div>
+        <div class="tags">${g.genre.slice(0,3).map(t=>`<span class="tag">${t}</span>`).join("")}</div>
+        <div class="desc">${g.desc}</div>
+        <div class="review"><span>유저 반응</span><span class="lbl" style="color:${r.c}">${r.t}</span></div>
+        <div class="bar"><i style="width:${g.rating}%;background:${r.c}"></i></div>
+        <div class="scale">
+          <div>용량<b>${fmtSize(g.size)}</b></div>
+          <div>1회 플레이<b>${fmtTime(g.time)}</b></div>
+          <div>모바일<b>${g.mobile?"지원":"PC 권장"}</b></div>
+        </div>
+        <a class="play" href="${g.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">▶ 플레이</a>
+      </div>
+    </article>`;
+  }).join("");
+  observeMedia(grid);
+}
+
+function toggleWish(id){
+  wish.has(id) ? wish.delete(id) : wish.add(id);
+  saveWish(); renderGrid();
+  if(document.getElementById("modal").classList.contains("open")) openModal(id);
+}
+
+/* ========== 상세 모달 ========== */
+function openModal(id){
+  const g = GAMES.find(x=>x.id===id), r = reaction(g.rating);
+  const box = document.getElementById("modalBox");
+  box.innerHTML = `
+    <div class="modal-art" style="${art(g)}">${mediaHTML(g)}<button class="close" onclick="closeModal()" aria-label="닫기">✕</button></div>
+    <div class="modal-content">
+      <div>
+        <h2>${g.title}</h2>
+        <div class="sub">${g.sub} · 개발: ${g.dev}</div>
+        <p>${g.desc}</p>
+        <div class="react-box">
+          <h5>유저 반응 요약</h5>
+          <div class="review"><span class="lbl" style="color:${r.c}">${r.t}</span><span>긍정 ${g.rating}%</span></div>
+          <div class="bar" style="margin-top:6px"><i style="width:${g.rating}%;background:${r.c}"></i></div>
+          <div class="pros-cons">
+            <ul class="pros">${g.pros.map(p=>`<li>${p}</li>`).join("")}</ul>
+            <ul class="cons">${g.cons.map(c=>`<li>${c}</li>`).join("")}</ul>
+          </div>
+          <div class="note">* 커뮤니티 반응을 바탕으로 한 대략적인 요약입니다.</div>
+        </div>
+        <div class="tags">${[...g.genre,...g.tags].map(t=>`<span class="tag">${t}</span>`).join("")}</div>
+      </div>
+      <aside class="side">
+        <div class="row"><span>게임 규모</span><span>${scaleLabel(g)}</span></div>
+        <div class="row"><span>예상 용량</span><span>${fmtSize(g.size)}</span></div>
+        <div class="row"><span>1회 플레이</span><span>${fmtTime(g.time)}</span></div>
+        <div class="row"><span>인원</span><span>${g.players}</span></div>
+        <div class="row"><span>모바일</span><span>${g.mobile?"✅ 지원":"❌ PC 권장"}</span></div>
+        <div class="row"><span>출시</span><span>${g.year}년</span></div>
+        <div class="row"><span>설치</span><span>필요 없음</span></div>
+        <a class="play" href="${g.url}" target="_blank" rel="noopener">▶ 지금 플레이</a>
+        <button class="wish-btn" onclick="toggleWish(${g.id})">${wish.has(g.id)?"❤️ 찜 해제":"🤍 찜하기"}</button>
+      </aside>
+    </div>`;
+  loadMedia(box.querySelector(".media"));
+  document.getElementById("modal").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function closeModal(){ document.getElementById("modal").classList.remove("open"); document.body.style.overflow=""; }
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+
+/* ========== 이벤트 ========== */
+document.getElementById("q").addEventListener("input", e=>{ state.q=e.target.value; renderGrid(); });
+document.getElementById("sort").addEventListener("change", e=>{ state.sort=e.target.value; renderGrid(); });
+document.getElementById("mobileOnly").addEventListener("change", e=>{ state.mobile=e.target.checked; renderGrid(); });
+document.getElementById("multiOnly").addEventListener("change", e=>{ state.multi=e.target.checked; renderGrid(); });
+
+renderHero(); heroTimer = setInterval(nextHero, 6000);
+renderGenres(); renderGrid();
+</script>
+</body>
+</html>
